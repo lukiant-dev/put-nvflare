@@ -1,0 +1,11 @@
+{
+  "name": "uncover-covid-xgboost",
+  "deploy_map": {
+    "app": [
+      "site-1",
+      "site-2",
+      "server"
+    ]
+  },
+  "min_clients": 2
+}

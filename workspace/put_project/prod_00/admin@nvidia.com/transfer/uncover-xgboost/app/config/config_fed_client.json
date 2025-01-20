@@ -1,0 +1,48 @@
+{
+  "format_version": 2,
+
+  "executors": [{
+    "tasks": [
+      "train", "validate", "submit_model"
+    ],
+    "executor": {
+      "id": "Executor",
+      "path": "uncover_xgboost.uncover_executor.FedXGBTreeUncoverExecutor",
+      "args": {
+        "all_rows_num": 701,
+        "random_seed": 8,
+        "dataset_root": "/data/",
+        "num_client_bagging": 1,
+        "lr_mode": "uniform",
+        "local_model_path": "local_model.json",
+        "global_model_path": "model_global.json",
+        "learning_rate": 0.01,
+        "objective": "binary:logistic",
+        "max_depth": 8,
+        "eval_metric": "logloss",
+        "tree_method": "auto",
+        "nthread": 4,
+        "analytic_sender_id": "analytic_sender"
+      }
+    }
+  }],
+
+  "task_result_filters": [],
+  "task_data_filters": [],
+  "components": [{
+      "id": "analytic_sender",
+      "name": "AnalyticsSender",
+      "args": {
+        "event_type": "analytix_log_stats"
+      }
+    },
+    {
+      "id": "event_to_fed",
+      "name": "ConvertToFedEvent",
+      "args": {
+        "events_to_convert": ["analytix_log_stats"],
+        "fed_event_prefix": "fed."
+      }
+    }
+  ]
+}

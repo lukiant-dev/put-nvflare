@@ -1,0 +1,79 @@
+{
+  "format_version": 2,
+  "job_name": "uncover-xgboost",
+
+  "server": {
+    "heart_beat_timeout": 600,
+    "task_request_interval": 0.05
+  },
+
+  "task_data_filters": [],
+  "task_result_filters": [],
+
+  "components": [{
+      "id": "persistor",
+      "path": "uncover_xgboost.uncover_model_persistor.UncoverXGBModelPersistor",
+      "args": {
+        "save_name": "xgboost_model.json"
+      }
+    },
+    {
+      "id": "shareable_generator",
+      "path": "uncover_xgboost.uncover_shareable_generator.XGBUncoverModelShareableGenerator",
+      "args": {}
+    },
+    {
+      "id": "aggregator",
+      "path": "nvflare.app_opt.xgboost.tree_based.bagging_aggregator.XGBBaggingAggregator",
+      "args": {}
+    },
+    {
+      "id": "model_locator",
+      "path": "uncover_xgboost.uncover_model_locator.UncoverXGBoostModelLocator",
+      "args": {}
+    },
+    {
+      "id": "json_generator",
+      "name": "ValidationJsonGenerator",
+      "args": {}
+    },
+    {
+      "id": "tb_analytics_receive",
+      "path": "uncover_xgboost.sandbox_analytics_receiver.TBSandboxAnalyticsReceiver",
+      "args": {
+        "events": [
+          "fed.analytix_log_stats"
+        ],
+        "tb_folder": "/tb_folder",
+        "job_name": "{job_name}"
+      }
+    }
+  ],
+  "workflows": [{
+      "id": "scatter_and_gather",
+      "name": "ScatterAndGather",
+      "args": {
+        "min_clients": 2,
+        "num_rounds": 100,
+        "start_round": 0,
+        "wait_time_after_min_received": 0,
+        "aggregator_id": "aggregator",
+        "persistor_id": "persistor",
+        "shareable_generator_id": "shareable_generator",
+        "train_task_name": "train",
+        "allow_empty_global_weights": true,
+        "train_timeout": 0,
+        "task_check_period": 0.01,
+        "persist_every_n_rounds": 0,
+        "snapshot_every_n_rounds": 0
+      }
+    },
+    {
+      "id": "cross_site_validate",
+      "name": "CrossSiteModelEval",
+      "args": {
+        "model_locator_id": "model_locator"
+      }
+    }
+  ]
+}
