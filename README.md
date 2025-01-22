@@ -17,8 +17,11 @@ The compose.yaml was supplemented with tensorboard service to visualize accuracy
 On top of this working infrastructure there are some minor usability enhancements added.
 
 Last the two examples were added to show different nvflare jobs:
-1) cifar10_fedavg -> deviated from: https://github.com/NVIDIA/NVFlare/tree/main/examples/advanced/cifar10/cifar10-real-world
-2) uncover-xgboost -> build from: https://github.com/NVIDIA/NVFlare/tree/main/examples/advanced/xgboost/tree-based but with dataset coming from kaggle competition: https://www.kaggle.com/datasets/roche-data-science-coalition/uncover/data
+1) Needs downloading the dataset and copying it to transfer/cifar10_splits directory on each site:
+cifar10_fedavg -> deviated from: https://github.com/NVIDIA/NVFlare/tree/main/examples/advanced/cifar10/cifar10-real-world
+
+2) Ready to be used: 
+uncover-xgboost -> build from: https://github.com/NVIDIA/NVFlare/tree/main/examples/advanced/xgboost/tree-based but with dataset coming from kaggle competition: https://www.kaggle.com/datasets/roche-data-science-coalition/uncover/data
 
 
 ## Execution 
@@ -30,7 +33,7 @@ docker compose build
 docker compose up -d 
 ```
 
-2). Run examples:
+2) Run example:
 
 ```
 cd workspace/put_project/prod_00/admin@nvidia.com/startup  
