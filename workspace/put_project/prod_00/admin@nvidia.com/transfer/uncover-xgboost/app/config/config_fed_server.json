@@ -39,7 +39,7 @@
     },
     {
       "id": "tb_analytics_receive",
-      "path": "uncover_xgboost.sandbox_analytics_receiver.TBSandboxAnalyticsReceiver",
+      "path": "uncover_xgboost.new_tb_receiver.TBNewAnalyticsReceiver",
       "args": {
         "events": [
           "fed.analytix_log_stats"

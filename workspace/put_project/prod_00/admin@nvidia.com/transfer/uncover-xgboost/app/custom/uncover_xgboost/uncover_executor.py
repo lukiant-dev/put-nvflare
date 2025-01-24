@@ -14,6 +14,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from typing import Tuple
+import time
 
 import xgboost as xgb
 import numpy as np
@@ -97,6 +98,7 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
         self.dataset_root= dataset_root
         self.analytic_sender_id = analytic_sender_id
         self.best_score = 0
+        self.current_epoch = 0
 
         # use dynamic shrinkage - adjusted by personalized scaling factor
         if lr_mode not in ["uniform", "scaled"]:
@@ -111,7 +113,7 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
         full_labels = full_dataset['admission_disposition']
         full_dataset = full_dataset.drop(columns=['admission_disposition'])
         
-        self.train_set, self.val_set, self.train_labels, self.val_labels = train_test_split(full_dataset, full_labels, train_size=0.8, random_state=self.random_seed)
+        self.train_set, self.val_set, self.train_labels, self.val_labels = train_test_split(full_dataset, full_labels, train_size=0.7, random_state=self.random_seed)
 
         # training
         dmat_train = xgb.DMatrix(self.train_set, label=self.train_labels)
@@ -144,8 +146,6 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
             self.analytic_sender = engine.get_component(self.analytic_sender_id)
             self.writer = self.analytic_sender
 
-            if not isinstance(self.analytic_sender, AnalyticsSender):
-                raise TypeError(f"Analytic sender must be AnalyticsSender type. Got: {type(self.analytic_sender)}")
         except Exception as e:
             self.log_exception(fl_ctx, f"Uncover Executor initialize exception: {secure_format_exception(e)}")
 
@@ -205,20 +205,18 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
 
         self.log_info(
             fl_ctx,
-            f"Global METRIC {quality_metric}",
+            f"Global METRIC: {quality_metric}", f"train_acc: {train_acc}, valid_acc: {valid_acc}",
         )
         if self.writer:
             # note: writing auc before current training step, for passed in global model
             self.writer.add_scalar(
-                f"uncover_xgboost_{self.eval_metric}", quality_metric, int(self.bst.num_boosted_rounds())
-            )
+                f"uncover_xgboost_{self.eval_metric}", quality_metric, self.current_epoch)
             self.writer.add_scalar(
-                "uncover_xgboost_train_acc", train_acc, int(self.bst.num_boosted_rounds())
-            )
-            # self.writer.add_scalar(
-            #     "uncover_xgboost_valid_acc", valid_acc, int(self.bst.num_boosted_rounds())
-            # )
-        return bst, eval_results, quality_metric
+                "uncover_xgboost_train_acc", train_acc, self.current_epoch)
+            self.writer.add_scalar(
+                "uncover_xgboost_valid_acc", valid_acc, self.current_epoch)
+
+        return bst, eval_results, valid_acc
 
     def _local_boost_cyclic(self, fl_ctx: FLContext):
         # Cyclic mode
@@ -317,15 +315,19 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
 
         if acc > self.best_score:
             self.best_score = acc
+            self.log_info(fl_ctx, f"Saving best local model with val acc score: {acc} in epoch: {self.current_epoch}")
             with open(self.local_model_path, "w") as f:
                 # save bytearray to file 
                 f.write(self.local_model.decode("utf-8"))
-                
+            
+            size = os.stat(self.local_model_path).st_size
+            self.log_info(fl_ctx, f"Saved best local model file with size: {size} in epoch: {self.current_epoch}")
+
         # report updated model in shareable
         dxo = DXO(data_kind=DataKind.WEIGHTS, data={"model_data": self.local_model})
         self.log_info(fl_ctx, "Local epochs finished. Returning shareable")
         new_shareable = dxo.to_shareable()
-
+        self.current_epoch += 1
         if self.writer:
             self.writer.flush()
         return new_shareable
@@ -335,6 +337,7 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
         del self.bst
         del self.dmat_train
         del self.dmat_valid
+        time.sleep(15)
         self.log_info(fl_ctx, "Freed training resources")
 
     def execute(self, task_name: str, shareable: Shareable, fl_ctx: FLContext, abort_signal: Signal) -> Shareable:
@@ -388,9 +391,6 @@ class FedXGBTreeUncoverExecutor(Executor, ABC):
             
         train_pred = np.rint(self.bst.predict(self.dmat_train))
         val_pred = np.rint(self.bst.predict(self.dmat_valid))
-
-        self.log_info(fl_ctx, f"TRAINP type: {type(train_pred)} {train_pred}")
-        self.log_info(fl_ctx, f"TRAINL type: {type(self.train_labels)} {self.train_labels.to_numpy()}")
 
         train_acc = accuracy_score(self.train_labels.to_numpy(), train_pred)
         val_acc = accuracy_score(self.val_labels.to_numpy(), val_pred)
